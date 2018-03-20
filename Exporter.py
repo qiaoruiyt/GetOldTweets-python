@@ -63,7 +63,8 @@ def main(argv):
 
 		def receiveBuffer(tweets):
 			for t in tweets:
-				outputFile.write(('\n%s;%s;%d;%d;"%s";%s;%s;%s;"%s";%s' % (t.username, t.date.strftime("%Y-%m-%d %H:%M"), t.retweets, t.favorites, t.text, t.geo, t.mentions, t.hashtags, t.id, t.permalink)))
+				if True or isAscii(t):
+					outputFile.write(('\n%s;%s;%d;%d;"%s";%s;%s;%s;"%s";%s' % (t.username, t.date.strftime("%Y-%m-%d %H:%M"), t.retweets, t.favorites, t.text, t.geo, t.mentions, t.hashtags, t.id, t.permalink)))
 			outputFile.flush()
 			print('More %d saved on file...\n' % len(tweets))
 
@@ -74,6 +75,13 @@ def main(argv):
 	finally:
 		outputFile.close()
 		print('Done. Output file generated "%s".' % outputFileName)
+
+def isAscii(x):
+	try:
+		x.decode('ascii')
+		return True
+	except:
+		return False
 
 if __name__ == '__main__':
 	main(sys.argv[1:])

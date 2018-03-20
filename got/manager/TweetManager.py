@@ -7,11 +7,13 @@ class TweetManager:
 	def __init__(self):
 		pass
 		
+	# The modified version will remove url automatically from tweets
 	@staticmethod
-	def getTweets(tweetCriteria, receiveBuffer=None, bufferLength=100, proxy=None):
+	def getTweets(tweetCriteria, receiveBuffer=None, bufferLength=1000, proxy=None, selector=None, text_processor=None):
 		refreshCursor = ''
 	
 		results = []
+		num_collected = 0
 		resultsAux = []
 		cookieJar = cookielib.CookieJar()
 		
@@ -19,9 +21,18 @@ class TweetManager:
 			tweetCriteria.username = tweetCriteria.username[1:-1]
 
 		active = True
+		num_of_errors = 0
 
 		while active:
-			json = TweetManager.getJsonReponse(tweetCriteria, refreshCursor, cookieJar, proxy)
+			try:
+				json = TweetManager.getJsonReponse(tweetCriteria, refreshCursor, cookieJar, proxy)
+				num_of_errors = 0
+			except:
+				num_of_errors += 1
+				if num_of_errors >= 5:
+					print("More than 5 errors are continously received, break")
+					break
+				continue
 			if len(json['items_html'].strip()) == 0:
 				break
 
@@ -37,39 +48,52 @@ class TweetManager:
 			for tweetHTML in tweets:
 				tweetPQ = PyQuery(tweetHTML)
 				tweet = models.Tweet()
-				
-				usernameTweet = tweetPQ("span:first.username.u-dir b").text()
-				txt = re.sub(r"\s+", " ", tweetPQ("p.js-tweet-text").text().replace('# ', '#').replace('@ ', '@'))
-				retweets = int(tweetPQ("span.ProfileTweet-action--retweet span.ProfileTweet-actionCount").attr("data-tweet-stat-count").replace(",", ""))
-				favorites = int(tweetPQ("span.ProfileTweet-action--favorite span.ProfileTweet-actionCount").attr("data-tweet-stat-count").replace(",", ""))
-				dateSec = int(tweetPQ("small.time span.js-short-timestamp").attr("data-time"))
+				try:
+					tweet_text = filter(lambda x: isinstance(x, basestring), tweetPQ("p.js-tweet-text").contents())[0].strip()
+				except:
+					print("Unable to parse this tweet")
+					continue
+				txt = re.sub(r"\s+", " ", tweet_text.replace('# ', '#').replace('@ ', '@'))
 				id = tweetPQ.attr("data-tweet-id")
-				permalink = tweetPQ.attr("data-permalink-path")
+				# usernameTweet = tweetPQ("span:first.username.u-dir b").text()
+				# retweets = int(tweetPQ("span.ProfileTweet-action--retweet span.ProfileTweet-actionCount").attr("data-tweet-stat-count").replace(",", ""))
+				# favorites = int(tweetPQ("span.ProfileTweet-action--favorite span.ProfileTweet-actionCount").attr("data-tweet-stat-count").replace(",", ""))
+				# dateSec = int(tweetPQ("small.time span.js-short-timestamp").attr("data-time"))
+				# permalink = tweetPQ.attr("data-permalink-path")
 				
-				geo = ''
-				geoSpan = tweetPQ('span.Tweet-geo')
-				if len(geoSpan) > 0:
-					geo = geoSpan.attr('title')
+				# geo = ''
+				# geoSpan = tweetPQ('span.Tweet-geo')
+				# if len(geoSpan) > 0:
+				# 	geo = geoSpan.attr('title')
 				
+				if text_processor:
+					txt = text_processor(txt)
+
 				tweet.id = id
-				tweet.permalink = 'https://twitter.com' + permalink
-				tweet.username = usernameTweet
 				tweet.text = txt
-				tweet.date = datetime.datetime.fromtimestamp(dateSec)
-				tweet.retweets = retweets
-				tweet.favorites = favorites
-				tweet.mentions = " ".join(re.compile('(@\\w*)').findall(tweet.text))
-				tweet.hashtags = " ".join(re.compile('(#\\w*)').findall(tweet.text))
-				tweet.geo = geo
-				
-				results.append(tweet)
-				resultsAux.append(tweet)
+				# tweet.permalink = 'https://twitter.com' + permalink
+				# tweet.username = usernameTweet
+				# tweet.date = datetime.datetime.fromtimestamp(dateSec)
+				# tweet.retweets = retweets
+				# tweet.favorites = favorites
+				# tweet.mentions = " ".join(re.compile('(@\\w*)').findall(tweet.text))
+				# tweet.hashtags = " ".join(re.compile('(#\\w*)').findall(tweet.text))
+				# tweet.geo = geo
+				if selector:
+					if selector(txt):
+						# results.append(tweet)
+						resultsAux.append(tweet)
+						num_collected += 1
+				else:
+					num_collected += 1
+					resultsAux.append(tweet)
 				
 				if receiveBuffer and len(resultsAux) >= bufferLength:
+					print(num_collected, "collected,",)
 					receiveBuffer(resultsAux)
 					resultsAux = []
 				
-				if tweetCriteria.maxTweets > 0 and len(results) >= tweetCriteria.maxTweets:
+				if tweetCriteria.maxTweets > 0 and num_collected >= tweetCriteria.maxTweets:
 					active = False
 					break
 					
@@ -77,7 +101,7 @@ class TweetManager:
 		if receiveBuffer and len(resultsAux) > 0:
 			receiveBuffer(resultsAux)
 		
-		return results
+		# return results
 	
 	@staticmethod
 	def getJsonReponse(tweetCriteria, refreshCursor, cookieJar, proxy):
@@ -99,7 +123,9 @@ class TweetManager:
 			
 		if hasattr(tweetCriteria, 'until'):
 			urlGetData += ' until:' + tweetCriteria.until
-		
+
+		if hasattr(tweetCriteria, 'lang'):
+			url += '&l=' + tweetCriteria.lang
 
 		if hasattr(tweetCriteria, 'topTweets'):
 			if tweetCriteria.topTweets:
@@ -128,10 +154,9 @@ class TweetManager:
 		try:
 			response = opener.open(url)
 			jsonResponse = response.read()
-		except:
+		except Exception as e:
 			print "Twitter weird response. Try to see on browser: https://twitter.com/search?q=%s&src=typd" % urllib.quote(urlGetData)
-			sys.exit()
-			return
+			raise
 		
 		dataJson = json.loads(jsonResponse)
 		
