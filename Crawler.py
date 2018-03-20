@@ -60,6 +60,7 @@ def main(argv):
 			elif opt == '--output':
 				outputFileName = arg
 				idFileName = 'id-'+arg
+		print('output to '+outputFileName)
 				
 		outputFile = codecs.open(outputFileName, "w+", "utf-8")
 		idFile = codecs.open(idFileName, "w+")
