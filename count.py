@@ -1,19 +1,28 @@
-import os
+import os, sys
 
-posfile = 'id-pos'
-negfile = 'id-neg'
-pos_count = 0
-neg_count = 0
+def main(argv):
 
-files = os.listdir()
-for i in files:
-    if posfile in i:
-        with open(i) as f:
-            for line in i.readlines():
-                pos_count += 1
-    elif negfile in i:
-        with open(i) as f:
-            for line in i.readlines():
-                neg_count += 1
-print(pos_count)
-print(neg_count)
+    if len(argv) == 0:
+        print('You must specify the data directory')
+
+    posfile = 'pos'
+    negfile = 'neg'
+    pos_count = 0
+    neg_count = 0
+
+    files = os.listdir(argv[0])
+    for i in files:
+        if posfile in i:
+            with open(i) as f:
+                for line in f.readlines():
+                    pos_count += 1
+        elif negfile in i:
+            with open(i) as f:
+                for line in f.readlines():
+                    neg_count += 1
+    print(pos_count)
+    print(neg_count)
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
