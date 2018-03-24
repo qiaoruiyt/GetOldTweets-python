@@ -10,7 +10,8 @@ def main(argv):
     pos_count = 0
     neg_count = 0
 
-    files = os.listdir(argv[0])
+    path = argv[0]
+    files = [path + '/' + i for i in os.listdir(path)]
     for i in files:
         if posfile in i:
             with open(i) as f:
